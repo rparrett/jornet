@@ -6,14 +6,18 @@
 //! - save high scores
 //! - get a leaderboard
 
-use bevy::prelude::{App, Plugin};
+use bevy::prelude::{App, ParallelSystemDescriptorCoercion, Plugin};
+use leaderboards::send_events;
 pub use leaderboards::Leaderboard;
 use uuid::Uuid;
 
 mod http;
 mod leaderboards;
 
-pub use leaderboards::{done_refreshing_leaderboard, Player, Score};
+pub use leaderboards::{
+    done_refreshing_leaderboard, CreatePlayerEvent, Player, RefreshLeaderboardEvent, Score,
+    SendScoreEvent,
+};
 
 /// Bevy Plugin handling communications with the Jornet server.
 pub struct JornetPlugin {
@@ -50,7 +54,11 @@ impl Plugin for JornetPlugin {
     fn build(&self, app: &mut App) {
         let leaderboard =
             Leaderboard::with_host_and_leaderboard(self.host.clone(), self.leaderboard, self.key);
-        app.insert_resource(leaderboard)
-            .add_system(done_refreshing_leaderboard);
+        app.add_event::<RefreshLeaderboardEvent>()
+            .add_event::<SendScoreEvent>()
+            .add_event::<CreatePlayerEvent>()
+            .insert_resource(leaderboard)
+            .add_system(done_refreshing_leaderboard)
+            .add_system(send_events.after(done_refreshing_leaderboard));
     }
 }
