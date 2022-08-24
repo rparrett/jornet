@@ -6,7 +6,7 @@
 //! - save high scores
 //! - get a leaderboard
 
-use bevy::prelude::{App, Plugin};
+use bevy::prelude::{App, ParallelSystemDescriptorCoercion, Plugin};
 use leaderboards::send_events;
 pub use leaderboards::Leaderboard;
 use uuid::Uuid;
@@ -44,6 +44,6 @@ impl Plugin for JornetPlugin {
         app.add_event::<LeaderboardEvent>()
             .insert_resource(leaderboard)
             .add_system(done_refreshing_leaderboard)
-            .add_system(send_events);
+            .add_system(send_events.after(done_refreshing_leaderboard));
     }
 }
