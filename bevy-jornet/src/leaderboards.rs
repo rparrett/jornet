@@ -16,14 +16,32 @@ use uuid::Uuid;
 
 use crate::http;
 
-/// Event to handle errors, will be sent asynchronously when occuring
-pub enum LeaderboardEvent {
-    SendScoreSucceeded,
-    SendScoreFailed,
-    CreatePlayerSucceeded,
-    CreatePlayerFailed,
-    RefreshLeaderboardSucceeded,
-    RefreshLeaderboardFailed,
+pub enum LeaderboardResult {
+    SendScoreEvent(SendScoreEvent),
+    CreatePlayerEvent(CreatePlayerEvent),
+    RefreshLeaderboardEvent(RefreshLeaderboardEvent),
+}
+
+/// Event to handle errors with [`send_score`], will be sent asynchronously when occuring
+pub enum SendScoreEvent {
+    /// Success
+    Success,
+    /// Failure
+    Failure,
+}
+/// Event to handle errors with [`create_player`], will be sent asynchronously when occuring
+pub enum CreatePlayerEvent {
+    /// Success
+    Success,
+    /// Failure
+    Failure,
+}
+/// Event to handle errors with [`refresh_leaderboard`], will be sent asynchronously when occuring
+pub enum RefreshLeaderboardEvent {
+    /// Success
+    Success,
+    /// Failure
+    Failure,
 }
 
 /// Leaderboard resource, used to interact with Jornet leaderboard.
@@ -32,7 +50,7 @@ pub struct Leaderboard {
     key: Uuid,
     leaderboard: Vec<Score>,
     updating: Arc<RwLock<Vec<Score>>>,
-    results: Arc<RwLock<Vec<LeaderboardEvent>>>,
+    results: Arc<RwLock<Vec<LeaderboardResult>>>,
     host: String,
     new_player: Arc<RwLock<Option<Player>>>,
     player: Option<Player>,
@@ -82,14 +100,18 @@ impl Leaderboard {
                     (*results)
                         .write()
                         .unwrap()
-                        .push(LeaderboardEvent::CreatePlayerSucceeded);
+                        .push(LeaderboardResult::CreatePlayerEvent(
+                            CreatePlayerEvent::Success,
+                        ));
 
                     *complete_player.write().unwrap() = Some(player);
                 } else {
                     (*results)
                         .write()
                         .unwrap()
-                        .push(LeaderboardEvent::CreatePlayerFailed);
+                        .push(LeaderboardResult::CreatePlayerEvent(
+                            CreatePlayerEvent::Failure,
+                        ));
 
                     warn!("error creating a player");
                 }
@@ -136,14 +158,14 @@ impl Leaderboard {
                         (*results)
                             .write()
                             .unwrap()
-                            .push(LeaderboardEvent::SendScoreFailed);
+                            .push(LeaderboardResult::SendScoreEvent(SendScoreEvent::Failure));
 
                         warn!("error sending the score");
                     } else {
                         (*results)
                             .write()
                             .unwrap()
-                            .push(LeaderboardEvent::SendScoreSucceeded);
+                            .push(LeaderboardResult::SendScoreEvent(SendScoreEvent::Success));
                     }
                 })
                 .detach();
@@ -176,14 +198,18 @@ impl Leaderboard {
                     (*results)
                         .write()
                         .unwrap()
-                        .push(LeaderboardEvent::RefreshLeaderboardSucceeded);
+                        .push(LeaderboardResult::RefreshLeaderboardEvent(
+                            RefreshLeaderboardEvent::Success,
+                        ));
                 } else {
                     warn!("error getting the leaderboard");
 
                     (*results)
                         .write()
                         .unwrap()
-                        .push(LeaderboardEvent::RefreshLeaderboardFailed);
+                        .push(LeaderboardResult::RefreshLeaderboardEvent(
+                            RefreshLeaderboardEvent::Failure,
+                        ));
                 }
             })
             .detach();
@@ -315,7 +341,9 @@ struct PlayerInput {
 /// [`CoreStage::Update`](bevy::prelude::CoreStage).
 pub fn send_events(
     leaderboard: ResMut<Leaderboard>,
-    mut error_event: EventWriter<LeaderboardEvent>,
+    mut create_player_event: EventWriter<CreatePlayerEvent>,
+    mut refresh_leaderboard_event: EventWriter<RefreshLeaderboardEvent>,
+    mut send_score_event: EventWriter<SendScoreEvent>,
 ) {
     if !leaderboard
         .results
@@ -325,7 +353,11 @@ pub fn send_events(
     {
         let mut results = leaderboard.results.write().unwrap();
         for r in results.drain(..) {
-            error_event.send(r);
+            match r {
+                LeaderboardResult::CreatePlayerEvent(e) => create_player_event.send(e),
+                LeaderboardResult::RefreshLeaderboardEvent(e) => refresh_leaderboard_event.send(e),
+                LeaderboardResult::SendScoreEvent(e) => send_score_event.send(e),
+            }
         }
     }
 }

@@ -14,7 +14,10 @@ use uuid::Uuid;
 mod http;
 mod leaderboards;
 
-pub use leaderboards::{done_refreshing_leaderboard, LeaderboardEvent, Score};
+pub use leaderboards::{
+    done_refreshing_leaderboard, CreatePlayerEvent, Player, RefreshLeaderboardEvent, Score,
+    SendScoreEvent,
+};
 
 /// Bevy Plugin handling communications with the Jornet server.
 pub struct JornetPlugin {
@@ -41,7 +44,9 @@ impl Plugin for JornetPlugin {
     fn build(&self, app: &mut App) {
         let leaderboard = Leaderboard::with_leaderboard(self.leaderboard, self.key);
 
-        app.add_event::<LeaderboardEvent>()
+        app.add_event::<RefreshLeaderboardEvent>()
+            .add_event::<SendScoreEvent>()
+            .add_event::<CreatePlayerEvent>()
             .insert_resource(leaderboard)
             .add_system(done_refreshing_leaderboard)
             .add_system(send_events.after(done_refreshing_leaderboard));
